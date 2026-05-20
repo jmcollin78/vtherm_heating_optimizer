@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Optional
+from typing import Optional
 
 try:
     import appdaemon.plugins.hass.hassapi as hass
@@ -35,45 +35,27 @@ class OptimizerConfig:
     cycle_seconds: int = 60
     hysteresis_on_delta_c: float = 0.4
     hysteresis_off_delta_c: float = 0.1
-    emergency_delta_c: float = 1.5
-    min_on_seconds: int = 600
-    min_off_seconds: int = 600
+    min_on_seconds: int = 3600
+    min_off_seconds: int = 3600
     battery_support_threshold_w: float = 500.0
     solar_support_threshold_w: float = 500.0
     ac_cop: float = 3.0
     pellet_kwh_per_kg: float = 4.8
     pellet_efficiency: float = 0.85
-    default_tempo_prices: Dict[str, float] = None  # type: ignore
-
-    def __post_init__(self) -> None:
-        if self.default_tempo_prices is None:
-            object.__setattr__(
-                self,
-                "default_tempo_prices",
-                {
-                    "blue_hc": 0.10,
-                    "blue_hp": 0.13,
-                    "white_hc": 0.13,
-                    "white_hp": 0.16,
-                    "red_hc": 0.15,
-                    "red_hp": 0.75,
-                },
-            )
+    pellet_bag_price_eur: float = 5.0
+    pellet_bag_weight_kg: float = 15.0
+    default_electricity_price_eur_kwh: float = 0.16
 
 
 @dataclass(frozen=True)
 class OptimizerInputs:
     indoor_temp_c: float
     setpoint_temp_c: float
-    tempo_color: str
-    tempo_period: str
-    tempo_price_eur_kwh: Optional[float]
+    electricity_price_eur_kwh: Optional[float]
     pv_power_w: float
     battery_soc_pct: float
     battery_power_w: float
-    surplus_solar_w: float
-    pellet_bag_price_eur: float
-    pellet_bag_weight_kg: float
+    net_consumption_w: float
 
 
 @dataclass(frozen=True)
@@ -94,31 +76,27 @@ class HeatingDecisionEngine:
         self.active_source = HeatingSource.NONE
         self.last_switch_at: Optional[datetime] = None
 
-    def _is_red_peak(self, tempo_color: str, tempo_period: str) -> bool:
-        return tempo_color.lower() == "red" and tempo_period.lower() == "hp"
-
     def _electricity_cost(self, data: OptimizerInputs) -> float:
-        if data.tempo_price_eur_kwh is not None and data.tempo_price_eur_kwh > 0:
-            return data.tempo_price_eur_kwh
+        if (
+            data.electricity_price_eur_kwh is not None
+            and data.electricity_price_eur_kwh > 0
+        ):
+            return data.electricity_price_eur_kwh
+        return self.config.default_electricity_price_eur_kwh
 
-        key = f"{data.tempo_color.lower()}_{data.tempo_period.lower()}"
-        return self.config.default_tempo_prices.get(
-            key, self.config.default_tempo_prices["white_hp"]
-        )
-
-    def _pellet_cost(self, data: OptimizerInputs) -> float:
+    def _pellet_cost(self) -> float:
         useful_kwh = (
-            data.pellet_bag_weight_kg
+            self.config.pellet_bag_weight_kg
             * self.config.pellet_kwh_per_kg
             * self.config.pellet_efficiency
         )
         if useful_kwh <= 0:
             return float("inf")
-        return data.pellet_bag_price_eur / useful_kwh
+        return self.config.pellet_bag_price_eur / useful_kwh
 
     def _has_support_energy(self, data: OptimizerInputs) -> bool:
         return (
-            data.surplus_solar_w >= self.config.solar_support_threshold_w
+            data.net_consumption_w <= -self.config.solar_support_threshold_w
             or data.battery_power_w >= self.config.battery_support_threshold_w
         )
 
@@ -145,14 +123,13 @@ class HeatingDecisionEngine:
         now = now or datetime.utcnow()
 
         electricity_cost = self._electricity_cost(data)
-        pellet_cost = self._pellet_cost(data)
+        pellet_cost = self._pellet_cost()
         ac_cost = (
             electricity_cost / self.config.ac_cop
             if self.config.ac_cop > 0
             else float("inf")
         )
         radiator_cost = electricity_cost
-        red_peak = self._is_red_peak(data.tempo_color, data.tempo_period)
 
         if not self._heat_needed(data):
             return DecisionResult(
@@ -165,13 +142,8 @@ class HeatingDecisionEngine:
             )
 
         support_energy = self._has_support_energy(data)
-        ac_allowed = not red_peak
-        radiator_allowed = not red_peak
-
-        if red_peak and data.indoor_temp_c < (
-            data.setpoint_temp_c - self.config.emergency_delta_c
-        ):
-            radiator_allowed = True
+        ac_allowed = True
+        radiator_allowed = True
 
         preferred = HeatingSource.PELLET
         reason = "pellet as base load"
@@ -184,8 +156,6 @@ class HeatingDecisionEngine:
             reason = "radiator as fallback"
 
         if preferred == HeatingSource.PELLET:
-            if not ac_allowed and not radiator_allowed:
-                reason = "red peak keeps electric sources disabled"
             if pellet_cost == float("inf") and radiator_allowed:
                 preferred = HeatingSource.RADIATOR
                 reason = "pellet cost unavailable, radiator fallback"
@@ -219,7 +189,7 @@ class VThermHeatingOptimizer(hass.Hass):
 
     config: OptimizerConfig
     engine: HeatingDecisionEngine
-    entities: Dict[str, str]
+    entities: dict[str, str]
     dry_run: bool
 
     def initialize(self) -> None:
@@ -227,7 +197,6 @@ class VThermHeatingOptimizer(hass.Hass):
             cycle_seconds=int(self.args.get("cycle_seconds", 60)),
             hysteresis_on_delta_c=float(self.args.get("hysteresis_on_delta_c", 0.4)),
             hysteresis_off_delta_c=float(self.args.get("hysteresis_off_delta_c", 0.1)),
-            emergency_delta_c=float(self.args.get("emergency_delta_c", 1.5)),
             min_on_seconds=int(self.args.get("min_on_seconds", 600)),
             min_off_seconds=int(self.args.get("min_off_seconds", 600)),
             battery_support_threshold_w=float(
@@ -239,31 +208,29 @@ class VThermHeatingOptimizer(hass.Hass):
             ac_cop=float(self.args.get("ac_cop", 3.0)),
             pellet_kwh_per_kg=float(self.args.get("pellet_kwh_per_kg", 4.8)),
             pellet_efficiency=float(self.args.get("pellet_efficiency", 0.85)),
+            pellet_bag_price_eur=float(self.args.get("pellet_bag_price_eur", 6.0)),
+            pellet_bag_weight_kg=float(self.args.get("pellet_bag_weight_kg", 15.0)),
+            default_electricity_price_eur_kwh=float(
+                self.args.get("default_electricity_price_eur_kwh", 0.16)
+            ),
         )
         self.engine = HeatingDecisionEngine(self.config)
 
         self.entities = {
-            "tempo_color": self.args.get("tempo_color_entity", "sensor.tempo_color"),
-            "tempo_period": self.args.get("tempo_period_entity", "sensor.tempo_period"),
-            "tempo_price": self.args.get("tempo_price_entity", "sensor.tempo_price"),
+            # Backward compatibility: tempo_price_entity is accepted if the new key is absent.
+            "electricity_price": self.args.get(
+                "electricity_price_entity",
+                self.args.get("tempo_price_entity", "sensor.tempo_price"),
+            ),
             "pv_power": self.args.get("pv_power_entity", "sensor.pv_power"),
             "battery_soc": self.args.get("battery_soc_entity", "sensor.battery_soc"),
             "battery_power": self.args.get(
                 "battery_power_entity", "sensor.battery_power"
             ),
-            "surplus_solar": self.args.get(
-                "surplus_solar_entity", "sensor.surplus_solar"
+            "net_consumption": self.args.get(
+                "net_consumption_entity", "sensor.net_consumption"
             ),
-            "indoor_temp": self.args.get("indoor_temp_entity", "sensor.temp_salon"),
-            "setpoint": self.args.get(
-                "setpoint_temp_entity", "input_number.vtherm_target_temp"
-            ),
-            "pellet_bag_price": self.args.get(
-                "pellet_bag_price_entity", "input_number.pellet_bag_price_eur"
-            ),
-            "pellet_bag_weight": self.args.get(
-                "pellet_bag_weight_entity", "input_number.pellet_bag_weight_kg"
-            ),
+            "indoor_temp": self.args.get("indoor_temp_entity"),
             "pellet_climate": self.args.get(
                 "pellet_climate_entity", "climate.vtherm_poele"
             ),
@@ -284,37 +251,49 @@ class VThermHeatingOptimizer(hass.Hass):
         except (TypeError, ValueError):
             return default
 
-    def _state_str(self, entity_id: str, default: str = "") -> str:
-        value = self.get_state(entity_id)
-        if value is None:
-            return default
-        return str(value)
-
     def _read_inputs(self) -> OptimizerInputs:
-        tempo_price_raw = self.get_state(self.entities["tempo_price"])
-        tempo_price = None
+        electricity_price_raw = self.get_state(self.entities["electricity_price"])
+        electricity_price = None
         try:
-            if tempo_price_raw not in (None, "", "unknown", "unavailable"):
-                tempo_price = float(tempo_price_raw)
+            if electricity_price_raw not in (None, "", "unknown", "unavailable"):
+                electricity_price = float(electricity_price_raw)
         except (TypeError, ValueError):
-            tempo_price = None
+            electricity_price = None
+
+        active_source = self.engine.active_source
+        source_to_climate = {
+            HeatingSource.PELLET: self.entities["pellet_climate"],
+            HeatingSource.AC: self.entities["ac_climate"],
+            HeatingSource.RADIATOR: self.entities["radiator_climate"],
+        }
+        ref_climate = source_to_climate.get(
+            active_source, self.entities["pellet_climate"]
+        )
+
+        setpoint_raw = self.get_state(ref_climate, attribute="temperature")
+        try:
+            setpoint = float(setpoint_raw) if setpoint_raw is not None else 20.0
+        except (TypeError, ValueError):
+            setpoint = 20.0
+
+        indoor_temp_entity = self.entities.get("indoor_temp")
+        if indoor_temp_entity:
+            indoor_temp = self._state_float(indoor_temp_entity, 19.0)
+        else:
+            indoor_raw = self.get_state(ref_climate, attribute="current_temperature")
+            try:
+                indoor_temp = float(indoor_raw) if indoor_raw is not None else 19.0
+            except (TypeError, ValueError):
+                indoor_temp = 19.0
 
         return OptimizerInputs(
-            indoor_temp_c=self._state_float(self.entities["indoor_temp"], 19.0),
-            setpoint_temp_c=self._state_float(self.entities["setpoint"], 20.0),
-            tempo_color=self._state_str(self.entities["tempo_color"], "white"),
-            tempo_period=self._state_str(self.entities["tempo_period"], "hp"),
-            tempo_price_eur_kwh=tempo_price,
+            indoor_temp_c=indoor_temp,
+            setpoint_temp_c=setpoint,
+            electricity_price_eur_kwh=electricity_price,
             pv_power_w=self._state_float(self.entities["pv_power"], 0.0),
             battery_soc_pct=self._state_float(self.entities["battery_soc"], 0.0),
             battery_power_w=self._state_float(self.entities["battery_power"], 0.0),
-            surplus_solar_w=self._state_float(self.entities["surplus_solar"], 0.0),
-            pellet_bag_price_eur=self._state_float(
-                self.entities["pellet_bag_price"], 6.0
-            ),
-            pellet_bag_weight_kg=self._state_float(
-                self.entities["pellet_bag_weight"], 15.0
-            ),
+            net_consumption_w=self._state_float(self.entities["net_consumption"], 0.0),
         )
 
     def _set_climate_mode(self, entity_id: str, hvac_mode: str) -> None:

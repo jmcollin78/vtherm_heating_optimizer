@@ -39,7 +39,6 @@ Le moteur pur `HeatingDecisionEngine` applique :
 - hysteresis de temperature (demarrage/arret),
 - contraintes anti-cycling (temps minimum ON/OFF),
 - estimation de couts (electricite, pellets, AC via COP),
-- regles Tempo rouge HP et mode urgence,
 - arbitrage final de source.
 
 ### Effet du mode dry_run
@@ -91,7 +90,6 @@ The pure `HeatingDecisionEngine` applies:
 - temperature hysteresis (start/stop),
 - anti-cycling constraints (minimum ON/OFF times),
 - cost estimation (electricity, pellets, AC through COP),
-- Tempo red peak rules and emergency behavior,
 - final source arbitration.
 
 ### Effect of dry_run mode

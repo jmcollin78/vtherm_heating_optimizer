@@ -15,12 +15,12 @@
 
 ### Paramètres / Entités nécessaires
 
-- `sensor.tempo_color` : Couleur du jour Tempo (bleu/blanc/rouge)
-- `sensor.tempo_period` : Plage horaire Tempo (HP/HC) ou `sensor.tempo_price` (€/kWh)
+- `sensor.electricity_price` : Prix horaire de l'électricité (€/kWh)
+- Compatibilité ascendante : `sensor.tempo_price` peut etre reutilise comme source de prix
 - `sensor.pv_power` : Puissance photovoltaïque instantanée
 - `sensor.battery_soc` : État de charge batterie (%)
 - `sensor.battery_power` : Puissance batterie (charge/décharge)
-- `sensor.surplus_solar` : Surplus solaire (optionnel)
+- `sensor.net_consumption` : Consommation nette du foyer (W) — négative si surplus solaire injecté, positive si tirage réseau
 - `sensor.temp_salon` : Température intérieure de référence
 - `sensor.temp_exterieure` : Température extérieure
 - `input_number.pellet_bag_price_eur` : Prix d'un sac de pellets (€)
@@ -40,8 +40,7 @@
     - Poêle : coût granulés (€/kWh utile), calculé à partir du prix et du poids du sac
     - Clim : coût élec / COP (€/kWh chaleur)
     - Radiateurs : coût élec direct (€/kWh)
-- Si surplus solaire ou batterie > seuil : favoriser la clim
-- Si tarif Tempo élevé (rouge HP) : éviter radiateurs et clim
+- Si consommation nette ≤ -`solar_support_threshold_w` (surplus solaire) ou batterie > seuil : favoriser la clim
 - Hystérésis sur la température pour éviter les oscillations :
     - Déclenchement appoint si T < consigne - 0,4°C
     - Arrêt appoint si T > consigne - 0,1°C
@@ -63,12 +62,12 @@
 
 ### Required Parameters / Entities
 
-- `sensor.tempo_color`: Tempo day color (blue/white/red)
-- `sensor.tempo_period`: Tempo period (peak/off-peak) or `sensor.tempo_price` (€/kWh)
+- `sensor.electricity_price`: Hourly electricity price (€/kWh)
+- Backward compatibility: `sensor.tempo_price` can still be used as the price source
 - `sensor.pv_power`: Instantaneous PV power
 - `sensor.battery_soc`: Battery state of charge (%)
 - `sensor.battery_power`: Battery power (charge/discharge)
-- `sensor.surplus_solar`: Solar surplus (optional)
+- `sensor.net_consumption`: Net household consumption (W) — negative when solar surplus is available, positive when drawing from the grid
 - `sensor.temp_salon`: Reference indoor temperature
 - `sensor.temp_exterieure`: Outdoor temperature
 - `input_number.pellet_bag_price_eur`: Pellet bag price (EUR)
@@ -88,8 +87,7 @@
     - Stove: pellet cost (€/kWh useful), computed from bag price and bag weight
     - AC: electricity cost / COP (€/kWh heat)
     - Radiators: direct electricity cost (€/kWh)
-- If solar surplus or battery > threshold: favor AC
-- If Tempo tariff is high (red peak): avoid radiators and AC
+- If net consumption ≤ -`solar_support_threshold_w` (solar surplus) or battery > threshold: favor AC
 - Hysteresis on temperature to avoid oscillations:
     - Trigger supplement if T < setpoint - 0.4°C
     - Stop supplement if T > setpoint - 0.1°C
