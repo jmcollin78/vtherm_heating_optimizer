@@ -8,7 +8,7 @@ anti-cycling constraints.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -120,7 +120,8 @@ class HeatingDecisionEngine:
     def decide(
         self, data: OptimizerInputs, now: Optional[datetime] = None
     ) -> DecisionResult:
-        now = now or datetime.utcnow()
+        if now is None:
+            now = datetime.now(timezone.utc)
 
         electricity_cost = self._electricity_cost(data)
         pellet_cost = self._pellet_cost()
@@ -178,7 +179,8 @@ class HeatingDecisionEngine:
         )
 
     def commit(self, source: HeatingSource, now: Optional[datetime] = None) -> None:
-        now = now or datetime.utcnow()
+        if now is None:
+            now = datetime.now(timezone.utc)
         if source != self.active_source:
             self.active_source = source
             self.last_switch_at = now
