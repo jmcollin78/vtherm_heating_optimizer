@@ -1,0 +1,45 @@
+vtherm_heating_optimizer:
+  module: vtherm_heating_optimizer
+  class: VThermHeatingOptimizer
+
+  # Scheduler
+  cycle_seconds: 60
+
+  # Thermal control
+  hysteresis_on_delta_c: 0.4
+  hysteresis_off_delta_c: 0.1
+  emergency_delta_c: 1.5
+
+  # Anti-cycling
+  min_on_seconds: 600
+  min_off_seconds: 600
+
+  # Cost model
+  ac_cop: 3.0
+  pellet_kwh_per_kg: 4.8
+  pellet_efficiency: 0.85
+
+  # Support energy thresholds
+  battery_support_threshold_w: 500
+  solar_support_threshold_w: 500
+
+  # Sensors
+  tempo_color_entity: sensor.tempo_color
+  tempo_period_entity: sensor.tempo_period
+  tempo_price_entity: sensor.tempo_price
+  pv_power_entity: sensor.pv_power
+  battery_soc_entity: sensor.battery_soc
+  battery_power_entity: sensor.battery_power
+  surplus_solar_entity: sensor.surplus_solar
+  indoor_temp_entity: sensor.temp_salon
+  setpoint_temp_entity: input_number.vtherm_target_temp
+  pellet_bag_price_entity: input_number.pellet_bag_price_eur
+  pellet_bag_weight_entity: input_number.pellet_bag_weight_kg
+
+  # Controlled climates
+  pellet_climate_entity: climate.vtherm_poele
+  ac_climate_entity: climate.clim_salon
+  radiator_climate_entity: climate.thermostat_sam1
+
+  # Keep true for first deployment validation
+  dry_run: true

@@ -31,3 +31,43 @@ The "VTherm Heating Optimizer" module automatically optimizes the choice of heat
 - Home Assistant users with Versatile Thermostat
 - Homeowners with multiple heating sources
 - Advanced users seeking automated energy optimization
+
+## FR - Prototype AppDaemon (Step 1)
+
+### Fichiers
+- Script AppDaemon : `appdaemon/apps/vtherm_heating_optimizer.py`
+- Exemple de configuration : `appdaemon/apps/apps.yaml.example`
+- Tests unitaires : `tests/test_heating_decision_engine.py`
+
+### Comportement implante
+- Calcul du cout utile poele, clim et radiateurs a chaque cycle
+- Bascule selon priorites et couts
+- Hysteresis de temperature (declenchement et arret)
+- Anti-cycles ON/OFF (durees minimales)
+- Blocage des sources electriques en Tempo rouge HP, avec fallback secours
+- Mode `dry_run` pour valider la logique sans commander les equipements
+
+### Lancer les tests
+```bash
+pytest
+```
+
+## EN - AppDaemon Prototype (Step 1)
+
+### Files
+- AppDaemon script: `appdaemon/apps/vtherm_heating_optimizer.py`
+- Configuration example: `appdaemon/apps/apps.yaml.example`
+- Unit tests: `tests/test_heating_decision_engine.py`
+
+### Implemented behavior
+- Compute effective cost for stove, AC and radiators at each cycle
+- Switch based on priorities and costs
+- Temperature hysteresis (start and stop thresholds)
+- ON/OFF anti-cycling (minimum durations)
+- Electric sources disabled during red Tempo peak, with emergency fallback
+- `dry_run` mode to validate logic without controlling equipment
+
+### Run tests
+```bash
+pytest
+```
