@@ -338,5 +338,23 @@ class VThermHeatingOptimizer(hass.Hass):
             f"ac={decision.ac_cost_eur_kwh:.3f}"
         )
 
+        # Notify Home Assistant only when the selected source changes.
+        previous_source = self.engine.active_source
         self._apply_source(decision.source)
         self.engine.commit(decision.source, now=now)
+
+        if decision.source != previous_source:
+            action = "allumé" if decision.source != HeatingSource.NONE else "éteint"
+            equip = (
+                decision.source.value
+                if decision.source != HeatingSource.NONE
+                else previous_source.value
+            )
+            message = (
+                f"🔥 L'équipement '{equip}' a été {action} (raison : {decision.reason})"
+            )
+            self.call_service(
+                "persistent_notification/create",
+                title="vtherm_heating_optimizer - Changement d'état chauffage",
+                message=message,
+            )

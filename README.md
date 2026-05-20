@@ -44,6 +44,7 @@ The "VTherm Heating Optimizer" module automatically optimizes the choice of heat
 - Bascule selon priorites et couts
 - Hysteresis de temperature (declenchement et arret)
 - Anti-cycles ON/OFF (durees minimales)
+- Notification persistante Home Assistant a chaque changement d'equipement (allumage/extinction)
 - Mode `dry_run` pour valider la logique sans commander les equipements
 
 ### Configuration des capteurs
@@ -74,6 +75,7 @@ pytest
 - Switch based on priorities and costs
 - Temperature hysteresis (start and stop thresholds)
 - ON/OFF anti-cycling (minimum durations)
+- Home Assistant persistent notification on each equipment change (on/off)
 - `dry_run` mode to validate logic without controlling equipment
 
 ### Sensor configuration

@@ -63,6 +63,11 @@ The "VTherm Heating Optimizer" module automatically optimizes the choice of heat
 | `battery_support_threshold_w` | W | 500 | Puissance de décharge minimale de la batterie pour considérer qu'elle peut soutenir le chauffage électrique. |
 | `solar_support_threshold_w` | W | 500 | Seuil de surplus solaire : la clim est favorisée si `net_consumption` ≤ −`solar_support_threshold_w`. |
 
+### Notifications
+
+- A chaque changement de source de chauffage selectionnee, le service Home Assistant `persistent_notification.create` est appele.
+- Le message contient l'equipement concerne, l'action (allume ou eteint) et la raison de la decision.
+
 ---
 
 ## EN - Detailed Sensor and Parameter Configuration
@@ -93,3 +98,8 @@ The "VTherm Heating Optimizer" module automatically optimizes the choice of heat
 | `default_electricity_price_eur_kwh` | €/kWh | 0.20 | Fallback price when `electricity_price_entity` is absent or invalid. |
 | `battery_support_threshold_w` | W | 500 | Minimum battery discharge power to consider it can support electric heating. |
 | `solar_support_threshold_w` | W | 500 | Solar surplus threshold: AC is favored when `net_consumption` ≤ −`solar_support_threshold_w`. |
+
+### Notifications
+
+- On each selected heating source change, the Home Assistant service `persistent_notification.create` is called.
+- The message includes the impacted equipment, the action (on or off), and the decision reason.
